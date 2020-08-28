@@ -50,7 +50,7 @@ add_definitions(-DQT_NO_KEYWORDS -g)
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 set(HEADER_FILES
-  src/jog_frame_panel.h src/jog_joint_panel.h src/jog_slider.h
+  src/jog_frame_panel.h src/jog_joint_panel.h src/jog_slider.h src/jog_frame_panel_abs.h
 )
 
 if(rviz_QT_VERSION VERSION_LESS "5")
@@ -61,6 +61,7 @@ endif()
 
 set(SOURCE_FILES
   src/jog_frame_panel.cpp
+  src/jog_frame_panel_abs.cpp
   src/jog_joint_panel.cpp
   ${MOC_FILES}
   )
@@ -79,6 +80,9 @@ endif()
 
 add_executable(jog_frame_node src/jog_frame_node.cpp)
 target_link_libraries(jog_frame_node ${catkin_LIBRARIES} ${Boost_LIBRARIES})
+
+add_executable(jog_frame_node_abs src/jog_frame_node_abs.cpp)
+target_link_libraries(jog_frame_node_abs ${catkin_LIBRARIES} ${Boost_LIBRARIES})
 
 add_executable(jog_joint_node src/jog_joint_node.cpp)
 target_link_libraries(jog_joint_node ${catkin_LIBRARIES} ${Boost_LIBRARIES})
