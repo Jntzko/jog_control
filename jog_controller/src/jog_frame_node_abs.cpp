@@ -137,9 +137,7 @@ void JogFrameNodeAbs::jog_frame_cb(jog_msgs::JogFrameAbsConstPtr msg)
     if(msg->damping_factor != 0) {
       damping_fac_ = std::min(1.0, std::max(0.1, msg->damping_factor));
     }
-    //ROS_WARN("req mutex 1");
-    std::lock_guard<std::mutex> guard_ref_msg(ref_msg_mutex_);
-    //ROS_INFO("mutex 1");
+    //std::lock_guard<std::mutex> guard_ref_msg(ref_msg_mutex_);
     ref_msg_ = msg;
 
     // Update timestamp of the last jog command
@@ -220,9 +218,7 @@ void JogFrameNodeAbs::getFkPose()
         ROS_ERROR_STREAM("fk[" << i << "]:\n" << fk.response.pose_stamped[0]);
       }
     }
-    // ROS_WARN("req mutex 4");
-    std::lock_guard<std::mutex> guard_pose_stamped(pose_stamped_mutex_);
-    // ROS_INFO("mutex 4");
+    //std::lock_guard<std::mutex> guard_pose_stamped(pose_stamped_mutex_);
     pose_stamped_ = fk.response.pose_stamped[0];
   }
   else
@@ -236,9 +232,7 @@ void JogFrameNodeAbs::jogStep()
 {
   // get the current pose, accessiable via pose_stamped_
   getFkPose();
-  //ROS_WARN("req mutex 5");
-  std::lock_guard<std::mutex> guard_pose_stamped(pose_stamped_mutex_);
-  //ROS_INFO("mutex 5");
+  //std::lock_guard<std::mutex> guard_pose_stamped(pose_stamped_mutex_);
 
   // Solve inverse kinematics
   moveit_msgs::GetPositionIK ik;
