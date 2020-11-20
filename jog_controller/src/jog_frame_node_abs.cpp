@@ -56,10 +56,10 @@ JogFrameNodeAbs::JogFrameNodeAbs()
   }  
 
   // Create subscribers
-  joint_state_sub_ = gnh.subscribe("joint_states", 10, &JogFrameNodeAbs::joint_state_cb, this);
-  jog_frame_sub_ = gnh.subscribe("jog_frame_abs", 10, &JogFrameNodeAbs::jog_frame_cb, this);
-  fk_client_ = gnh.serviceClient<moveit_msgs::GetPositionFK>("compute_fk");  
-  ik_client_ = gnh.serviceClient<moveit_msgs::GetPositionIK>("compute_ik");  
+  joint_state_sub_ = gnh.subscribe("joint_states", 1, &JogFrameNodeAbs::joint_state_cb, this);
+  jog_frame_sub_ = gnh.subscribe("jog_frame_abs", 1, &JogFrameNodeAbs::jog_frame_cb, this);
+  fk_client_ = gnh.serviceClient<moveit_msgs::GetPositionFK>("compute_fk");
+  ik_client_ = gnh.serviceClient<moveit_msgs::GetPositionIK>("compute_ik");
   ros::topic::waitForMessage<sensor_msgs::JointState>("joint_states");
   
   if (use_action_)
@@ -304,8 +304,8 @@ void JogFrameNodeAbs::jogStep()
 
   auto state = ik.response.solution.joint_state;
   geometry_msgs::PoseStamped pose_check;
-  
-  // Make sure the solution is valid in joint space
+
+  // Make sure the jump in joint space is not to large
   bool has_errors = false;
   for (int i=0; i<state.name.size(); i++)
   {
@@ -313,10 +313,14 @@ void JogFrameNodeAbs::jogStep()
     {
       if (state.name[i] == joint_state_.name[j])
       {
-        double e = fabs(state.position[i] - joint_state_.position[j]);
-        if(e > M_PI / 2) {
+        // if the joint state range is outside -Pi to Pi, we map it to that range
+        double ref_state = fmod(joint_state_.position[j] + M_PI, 2*M_PI);
+        if (ref_state < 0)
+          ref_state += 2*M_PI;
+        ref_state -= M_PI;
+        double e = fabs(state.position[i] - ref_state);
+        if(e > M_PI/2 and e < M_PI*1.5) {
           has_errors = true;
-          ROS_ERROR_STREAM(joint_state_.name[j] << " is at " << joint_state_.position[j] << " but target is " << state.position[i] << "!");
         }
         break;
       }
@@ -487,13 +491,16 @@ int main(int argc, char **argv)
   ros::init(argc, argv, "jog_frame_node_abs");
   jog_frame::JogFrameNodeAbs node;
   ros::Rate loop_rate(10);
-  
+  ros::AsyncSpinner spinner(4); // Use 4 threads
+  spinner.start();
+
   while ( ros::ok() )
   {
     node.update();
-    ros::spinOnce();
     loop_rate.sleep();
   }
+
+  ros::waitForShutdown();
   return 0;
 }
 
