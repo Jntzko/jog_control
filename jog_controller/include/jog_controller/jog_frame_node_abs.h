@@ -4,6 +4,7 @@
 #include <string>
 #include <ros/ros.h>
 #include <tf/tf.h>
+#include <tf/transform_broadcaster.h>
 #include <mutex>
 #include <jog_msgs/JogFrameAbs.h>
 #include <sensor_msgs/JointState.h>
@@ -63,6 +64,7 @@ protected:
   double time_from_start_;
   bool use_action_;
   bool intermittent_;
+  bool publish_tf_;
 
   jog_msgs::JogFrameAbsConstPtr ref_msg_;
   std::mutex ref_msg_mutex_;
@@ -76,6 +78,8 @@ protected:
   std::vector<std::string> exclude_joints_;
   sensor_msgs::JointState joint_state_;
   ros::Time last_stamp_;
+
+  static tf::TransformBroadcaster br;
 };
 
 } // namespace jog_frame

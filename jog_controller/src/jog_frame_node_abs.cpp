@@ -15,6 +15,7 @@ JogFrameNodeAbs::JogFrameNodeAbs() {
   pnh.param<double>("time_from_start", time_from_start_, 0.5);
   pnh.param<bool>("use_action", use_action_, false);
   pnh.param<bool>("intermittent", intermittent_, false);
+  pnh.param<bool>("publish_tf", publish_tf_, true);
 
   std::vector<std::string> group_names;
   gnh.getParam("/jog_frame_node/group_names", group_names);
@@ -124,6 +125,13 @@ void JogFrameNodeAbs::jog_frame_cb(jog_msgs::JogFrameAbsConstPtr msg) {
 
     // Update timestamp of the last jog command
     last_stamp_ = msg->header.stamp;
+  }
+
+  if (publish_tf_) {
+    static tf::TransformBroadcaster br;
+    tf::Transform transform;
+    tf::poseMsgToTF(msg->pose, transform);
+    br.sendTransform(tf::StampedTransform(transform, msg->header.stamp, msg->header.frame_id, "jog_goal"));
   }
 }
 
