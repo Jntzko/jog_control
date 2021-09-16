@@ -131,7 +131,8 @@ void JogFrameNodeAbs::jog_frame_cb(jog_msgs::JogFrameAbsConstPtr msg) {
     static tf::TransformBroadcaster br;
     tf::Transform transform;
     tf::poseMsgToTF(msg->pose, transform);
-    br.sendTransform(tf::StampedTransform(transform, msg->header.stamp, msg->header.frame_id, "jog_goal"));
+    br.sendTransform(tf::StampedTransform(transform, msg->header.stamp,
+                                          msg->header.frame_id, "jog_goal"));
   }
 }
 
@@ -221,12 +222,12 @@ void JogFrameNodeAbs::jogStep() {
   double position_dist = sqrt(((double)dirX * dirX) + ((double)dirY * dirY) +
                               ((double)dirZ * dirZ));
 
-  double nDirX = (dirX * damping_fac_);
-  double nDirY = (dirY * damping_fac_);
-  double nDirZ = (dirZ * damping_fac_);
-  ref_pose.pose.position.x = pose_stamped_.pose.position.x + nDirX;
-  ref_pose.pose.position.y = pose_stamped_.pose.position.y + nDirY;
-  ref_pose.pose.position.z = pose_stamped_.pose.position.z + nDirZ;
+  ref_pose.pose.position.x =
+      pose_stamped_.pose.position.x + dirX * damping_fac_;
+  ref_pose.pose.position.y =
+      pose_stamped_.pose.position.y + dirY * damping_fac_;
+  ref_pose.pose.position.z =
+      pose_stamped_.pose.position.z + dirZ * damping_fac_;
 
   // Apply orientation jog
   tf::Quaternion q_ref, q_act, q_jog, q_target;
