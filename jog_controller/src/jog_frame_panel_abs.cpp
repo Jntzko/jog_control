@@ -21,6 +21,7 @@ JogFramePanelAbs::JogFramePanelAbs(QWidget *parent) : rviz::Panel(parent) {
   for (int i = 0; i < link_names_.size(); i++) {
     ROS_INFO_STREAM("link_names:" << link_names_[i]);
   }
+  nh.getParam("/jog_frame_node/base_frame", base_frame_);
 
   QLayout *root_layout = initUi(parent);
   setLayout(root_layout);
