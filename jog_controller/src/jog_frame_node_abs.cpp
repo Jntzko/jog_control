@@ -2,6 +2,7 @@
 #include <cfloat>
 #include <jog_controller/jog_frame_node_abs.h>
 #include <math.h>
+#include <moveit/robot_state/conversions.h>
 #include <thread>
 #include <typeinfo>
 
@@ -90,6 +91,11 @@ JogFrameNodeAbs::JogFrameNodeAbs() {
               controller_name + "/command", 10);
     }
   }
+
+  // Bio Ik
+  // TODO
+  robot_model_loader_ =
+      new robot_model_loader::RobotModelLoader("/robot_description");
 }
 
 /**
