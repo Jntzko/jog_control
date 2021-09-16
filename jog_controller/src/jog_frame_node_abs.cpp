@@ -209,6 +209,7 @@ void JogFrameNodeAbs::jogStep() {
   ik.request.ik_request.ik_link_name = target_link_;
   ik.request.ik_request.robot_state.joint_state = joint_state_;
   ik.request.ik_request.avoid_collisions = avoid_collisions_;
+  ik.request.ik_request.return_approximate_solution = true;
 
   geometry_msgs::Pose act_pose = pose_stamped_.pose;
   geometry_msgs::PoseStamped ref_pose;
@@ -254,31 +255,107 @@ void JogFrameNodeAbs::jogStep() {
   quaternionTFToMsg(q_ref, ref_pose.pose.orientation);
   ik.request.ik_request.pose_stamped = ref_pose;
 
-  if (!ik_client_.call(ik)) {
-    ROS_ERROR("Failed to call service /compute_ik");
-    return;
-  }
-  if (ik.response.error_code.val != moveit_msgs::MoveItErrorCodes::SUCCESS) {
-    ROS_WARN("****IK error %d", ik.response.error_code.val);
-    return;
-  }
+  /*
+  // As we use approximate solution, we still want to make sure to stay within
+  // some constraints
+  // Orientation
+  moveit_msgs::OrientationConstraint orientation_constraint;
+  orientation_constraint.header.frame_id = frame_id_;
+  orientation_constraint.link_name = target_link_;
+  orientation_constraint.orientation = ref_pose.pose.orientation;
+  // Should be ~ 30 Degrees on each axis
+  orientation_constraint.absolute_x_axis_tolerance = 0.05;
+  orientation_constraint.absolute_y_axis_tolerance = 0.05;
+  orientation_constraint.absolute_z_axis_tolerance = 0.05;
+  orientation_constraint.weight = 1;
 
-  auto state = ik.response.solution.joint_state;
-  geometry_msgs::PoseStamped pose_check;
+  // Position
+  moveit_msgs::PositionConstraint position_constraint;
+  position_constraint.header.frame_id = frame_id_;
+  position_constraint.link_name = target_link_;
+  position_constraint.target_point_offset.x = 0.01;
+  position_constraint.target_point_offset.y = 0.01;
+  position_constraint.target_point_offset.z = 0.01;
+  position_constraint.weight = 1;
+
+  ik.request.ik_request.constraints.orientation_constraints.push_back(
+      orientation_constraint);
+  ik.request.ik_request.constraints.position_constraints.push_back(
+      position_constraint);
+*/
+  sensor_msgs::JointState ik_solution;
+
+  bool bio_ik = false;
+  if (bio_ik) {
+    kinematics::KinematicsQueryOptions opts;
+    // TODO position only
+    opts.return_approximate_solution = true; // optional
+                                             // opts.
+
+    robot_model_ = robot_model_loader_->getModel();
+    robot_state::RobotState robot_state_ik(robot_model_);
+    joint_model_group_ = robot_model_->getJointModelGroup(group_name_);
+
+    std::vector<std::string> names = joint_state_.name;
+    std::vector<double> positions = joint_state_.position;
+
+    for (int i = 0; i < names.size(); i++) {
+      std::string name = names[i];
+      double position = positions[i];
+      robot_state_ik.setJointPositions(name, &position);
+    }
+
+    // traditional "basic" bio-ik usage. The end-effector goal poses
+    // and end-effector link names are passed into the setFromIK()
+    // call. The KinematicsQueryOptions are empty.
+    //
+    bool ok = robot_state_ik.setFromIK(
+        joint_model_group_, // joints to be used for IK
+        ref_pose.pose,      // multiple end-effector goal poses
+        target_link_,       // names of the end-effector links
+        1, 0.0,             // solver attempts and timeout
+        moveit::core::GroupStateValidityCallbackFn(),
+        opts // mostly empty
+    );
+
+    moveit_msgs::RobotState solution;
+    moveit::core::robotStateToRobotStateMsg(robot_state_ik, solution, true);
+
+    ROS_WARN_STREAM("***** TODO check for collision" << ok);
+
+    // auto ik_solution = ik.response.solution.joint_state;
+    ik_solution = solution.joint_state;
+    // ROS_ERROR_STREAM("bioik " << solution.joint_state.name.size());
+    // ROS_ERROR_STREAM("mov   " <<
+    // ik.response.solution.joint_state.name.size());
+  } else {
+
+    if (!ik_client_.call(ik)) {
+      ROS_ERROR("Failed to call service /compute_ik");
+      return;
+    }
+    if (ik.response.error_code.val != moveit_msgs::MoveItErrorCodes::SUCCESS) {
+      ROS_WARN("****IK error %d", ik.response.error_code.val);
+      return;
+    }
+    ik_solution = ik.response.solution.joint_state;
+  }
 
   // Make sure the jump in joint space is not to large
   bool has_errors = false;
 
-  for (int i = 0; i < state.name.size(); i++) {
+  /*
+  // TODO, this seems wrong, I should rethink about this
+  for (int i = 0; i < ik_solution.name.size(); i++) {
     for (int j = 0; j < joint_state_.name.size(); j++) {
-      if (state.name[i] == joint_state_.name[j]) {
+      if (ik_solution.name[i] == joint_state_.name[j]) {
         // if the joint state range is outside -Pi to Pi, we map it to that
-        // range
+        // range TODO only for infinit joints
         double ref_state = fmod(joint_state_.position[j] + M_PI, 2 * M_PI);
         if (ref_state < 0)
           ref_state += 2 * M_PI;
         ref_state -= M_PI;
-        double e = fabs(state.position[i] - ref_state);
+        double e = fabs(ik_solution.position[i] - ref_state);
         if (e > M_PI / 2 and e < M_PI * 1.5) {
           has_errors = true;
         }
@@ -287,11 +364,32 @@ void JogFrameNodeAbs::jogStep() {
     }
   }
   if (has_errors) {
-    ROS_ERROR_STREAM("**** Abort due to errors!");
+    ROS_ERROR_STREAM("**** Abort, jump to large!");
+    return;
+  }*/
+
+  // Make sure the solution is valid in joint space
+  double error = 0;
+  int id = -1;
+  for (int i = 0; i < ik_solution.name.size(); i++) {
+    for (int j = 0; j < joint_state_.name.size(); j++) {
+      if (ik_solution.name[i] == joint_state_.name[j]) {
+        double e = fabs(ik_solution.position[i] - joint_state_.position[j]);
+        if (e > error) {
+          error = e;
+          id = i;
+        }
+        break;
+      }
+    }
+  }
+  if (error > M_PI / 2) {
+    ROS_ERROR_STREAM("**** Validation check Failed: " << error << "  at: "
+                                                      << ik_solution.name[id]);
     return;
   }
 
-  publishPose(state);
+  publishPose(ik_solution);
 }
 
 void JogFrameNodeAbs::publishPose(sensor_msgs::JointState state) {
