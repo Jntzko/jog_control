@@ -1,3 +1,4 @@
+<?xml version="1.0"?>
 <launch>
   <arg name="use_fake_joint" default="false"/>
   <arg name="use_moveit" default="false"/>
@@ -21,12 +22,14 @@
   <node if="$(arg use_rviz)"
 	name="rviz" pkg="rviz" type="rviz"
 	args="-d $(find jog_launch)/launch/jog.rviz"/>
-  
-  <rosparam command="load" file="$(find jog_launch)/config/ur_jog.yaml"/>
+
+  <rosparam command="load" file="$(find jog_launch)/config/ur5_jog.yaml"/>
+  <!--
   <node name="jog_joint_node" pkg="jog_controller" type="jog_joint_node">
     <param name="use_action" value="$(arg use_action)"/>
     <param name="intermittent" value="$(arg intermittent)"/>
   </node>
+  -->
 
   <node name="jog_frame_node" pkg="jog_controller" type="jog_frame_node"
   if="$(eval absolute == false)">
