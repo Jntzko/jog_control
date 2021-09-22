@@ -11,6 +11,13 @@
 #include <QtGui>
 #endif
 
+struct MoveGroup {
+  std::vector<std::string> group_names;
+  std::vector<std::string> link_names;
+  std::string base_frame;
+  std::string name_space;
+};
+
 namespace jog_controller {
 class JogFramePanelAbs : public rviz::Panel {
   Q_OBJECT
@@ -19,6 +26,7 @@ public:
   ~JogFramePanelAbs();
   QLayout *initUi(QWidget *parent);
   void updateBaseFrame(QComboBox *base_frame_qcb);
+  void updateLinkNames(QComboBox *target_link_qcb);
   virtual void onInitialize();
   virtual void load(const rviz::Config &config);
   virtual void save(rviz::Config config) const;
@@ -40,10 +48,13 @@ protected Q_SLOTS:
 
 protected:
   QComboBox *base_frame_qcb_;
+  QComboBox *target_link_qcb_;
+  std::vector<MoveGroup> move_groups_;
   std::vector<std::string> group_names_;
   std::vector<std::string> link_names_;
   std::string base_frame_;
-  ros::Publisher jog_frame_abs_pub_;
+  int current_mg_;
+  std::vector<ros::Publisher> jog_frame_abs_pub_;
 
   interactive_markers::InteractiveMarkerServer *server_;
   visualization_msgs::InteractiveMarker *int_marker_;

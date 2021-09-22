@@ -13,20 +13,44 @@ namespace jog_controller {
 JogFramePanelAbs::JogFramePanelAbs(QWidget *parent) : rviz::Panel(parent) {
   ros::NodeHandle nh;
   // Get groups parameter of jog_frame_node
-  nh.getParam("/jog_frame_node/group_names", group_names_);
-  for (int i = 0; i < group_names_.size(); i++) {
-    ROS_INFO_STREAM("group_names:" << group_names_[i]);
+
+  std::vector<std::string> all_param_names;
+  nh.getParamNames(all_param_names);
+
+  std::vector<std::string> all_ns;
+  for (auto &param : all_param_names) {
+    if (param.find("jog_frame_node") != std::string::npos) {
+      std::string ns = param.substr(0, param.find("jog_frame_node"));
+      if (std::find(all_ns.begin(), all_ns.end(), ns) == all_ns.end())
+        all_ns.push_back(ns);
+    }
   }
-  nh.getParam("/jog_frame_node/link_names", link_names_);
-  for (int i = 0; i < link_names_.size(); i++) {
-    ROS_INFO_STREAM("link_names:" << link_names_[i]);
+  for (auto &ns : all_ns) {
+    struct MoveGroup mg;
+    nh.getParam(ns + "jog_frame_node/group_names", mg.group_names);
+    nh.getParam(ns + "jog_frame_node/link_names", mg.link_names);
+    nh.getParam(ns + "jog_frame_node/base_frame", mg.base_frame);
+    mg.name_space = ns;
+    move_groups_.push_back(mg);
+
+    jog_frame_abs_pub_.push_back(
+        nh.advertise<jog_msgs::JogFrameAbs>(ns + "jog_frame_abs", 1));
   }
-  nh.getParam("/jog_frame_node/base_frame", base_frame_);
+
+  if (!move_groups_.empty()) {
+    current_mg_ = 0;
+    group_names_ = move_groups_[0].group_names;
+    link_names_ = move_groups_[0].link_names;
+    base_frame_ = move_groups_[0].base_frame;
+    target_link_ = link_names_[0];
+    frame_id_ = base_frame_;
+  } else {
+    ROS_WARN("No move groups available");
+  }
 
   QLayout *root_layout = initUi(parent);
   setLayout(root_layout);
 
-  jog_frame_abs_pub_ = nh.advertise<jog_msgs::JogFrameAbs>("jog_frame_abs", 1);
   master_on_publish_ = false;
   avoid_collisions_ = true;
 }
@@ -43,12 +67,11 @@ void JogFramePanelAbs::onInitialize() {
   initInteractiveMarkers();
   connect(vis_manager_, SIGNAL(preUpdate()), this, SLOT(update()));
   updateBaseFrame(base_frame_qcb_);
+  updateLinkNames(target_link_qcb_);
   resetInteractiveMarker();
 
   // initialize repeating timer
   QTimer *timer = new QTimer(this);
-  // connect( timer, &QTimer::timeout, this,
-  // QOverload<>::of(&JogFramePanelAbs::update));
   connect(timer, SIGNAL(timeout()), this, SLOT(update()));
 
   // send 20 jog commands per second
@@ -62,7 +85,7 @@ void JogFramePanelAbs::onInitialize() {
  */
 void JogFramePanelAbs::update() {
   if (master_on_publish_ && on_publish_marker_) {
-    jog_frame_abs_pub_.publish(marker_msg_);
+    jog_frame_abs_pub_[current_mg_].publish(marker_msg_);
   }
 }
 
@@ -89,6 +112,7 @@ geometry_msgs::Pose *JogFramePanelAbs::getTargetLinkPose() {
   try {
     geometry_msgs::TransformStamped transform;
     transform = tf->lookupTransform(frame_id_, target_link_, ros::Time());
+
     geometry_msgs::Pose *pose = new geometry_msgs::Pose();
     pose->position.x = transform.transform.translation.x;
     pose->position.y = transform.transform.translation.y;
@@ -120,8 +144,9 @@ void JogFramePanelAbs::interactiveMarkerFeedback(
     marker_msg_.avoid_collisions = avoid_collisions_;
     marker_msg_.damping_factor = damping_fac_;
 
-    // reset the marker to the endeffectors position when mouse_up and stop the
-    // end effector from moving by setting marker_msg_ to it's actual pose.
+    // reset the marker to the endeffectors position when mouse_up and stop
+    // the end effector from moving by setting marker_msg_ to it's actual
+    // pose.
     if (feedback->event_type == feedback->MOUSE_UP) {
       on_publish_marker_ = false;
       // tell target link to stay where it is
@@ -130,7 +155,7 @@ void JogFramePanelAbs::interactiveMarkerFeedback(
       if (pose != nullptr) {
         marker_msg_.pose = *pose;
         if (master_on_publish_) {
-          jog_frame_abs_pub_.publish(marker_msg_);
+          jog_frame_abs_pub_[current_mg_].publish(marker_msg_);
         }
       }
     } else {
@@ -151,6 +176,13 @@ void JogFramePanelAbs::respondTargetLink(QString text) {
 
 void JogFramePanelAbs::respondGroupName(QString text) {
   group_name_ = text.toStdString();
+  for (int i = 0; i < move_groups_.size(); i++) {
+    for (auto &group_name : move_groups_[i].group_names) {
+      if (group_name_ == group_name)
+        current_mg_ = i;
+    }
+  }
+  updateLinkNames(target_link_qcb_);
   resetInteractiveMarker();
 }
 
@@ -194,9 +226,9 @@ QLayout *JogFramePanelAbs::initUi(QWidget *parent) {
   // Move Group
   QComboBox *groupBox = new QComboBox();
   groupBox->setEditable(true);
-  for (auto it = group_names_.begin(); it != group_names_.end(); it++) {
-    if (!it->empty())
-      groupBox->addItem(it->c_str());
+  for (auto mg : move_groups_) {
+    for (auto &group_name : mg.group_names)
+      groupBox->addItem(group_name.c_str());
   }
   group_name_ = groupBox->currentText().toStdString();
   tree->setItemWidget(items.value(1), 1, groupBox);
@@ -207,15 +239,9 @@ QLayout *JogFramePanelAbs::initUi(QWidget *parent) {
   tree->setItemWidget(items.value(2), 1, base_frame_qcb_);
 
   // End-Effector Link
-  QComboBox *targetlink = new QComboBox();
-  targetlink->setEditable(true);
-  targetlink->clear();
-  for (int i = 0; i < link_names_.size(); i++) {
-    targetlink->addItem(link_names_[i].c_str());
-  }
-  targetlink->setCurrentIndex(0);
-  target_link_ = targetlink->currentText().toStdString();
-  tree->setItemWidget(items.value(3), 1, targetlink);
+  target_link_qcb_ = new QComboBox();
+  target_link_qcb_->setEditable(true);
+  tree->setItemWidget(items.value(3), 1, target_link_qcb_);
 
   // Damping Factor
   QDoubleSpinBox *damping_factor_qdsb = new QDoubleSpinBox();
@@ -239,7 +265,7 @@ QLayout *JogFramePanelAbs::initUi(QWidget *parent) {
           SLOT(respondCollision(bool)));
   connect(damping_factor_qdsb, SIGNAL(valueChanged(double)), this,
           SLOT(respondDamping(double)));
-  connect(targetlink, SIGNAL(currentTextChanged(QString)), this,
+  connect(target_link_qcb_, SIGNAL(currentTextChanged(QString)), this,
           SLOT(respondTargetLink(QString)));
   connect(groupBox, SIGNAL(currentTextChanged(QString)), this,
           SLOT(respondGroupName(QString)));
@@ -255,14 +281,21 @@ void JogFramePanelAbs::updateBaseFrame(QComboBox *base_frame_qcb) {
   vis_manager_->getTF2BufferPtr()->_getFrameStrings(frames);
   std::sort(frames.begin(), frames.end());
   base_frame_qcb->clear();
-  for (auto it = frames.begin(); it != frames.end(); ++it) {
-    if (!it->empty()) {
-      base_frame_qcb->addItem(it->c_str());
-    }
+  for (auto &frame : frames) {
+    base_frame_qcb->addItem(frame.c_str());
   }
+  base_frame_ = move_groups_[current_mg_].base_frame;
   base_frame_qcb->setCurrentIndex(
       base_frame_qcb->findText(QString::fromStdString(base_frame_)));
   frame_id_ = base_frame_qcb->currentText().toStdString();
+}
+
+void JogFramePanelAbs::updateLinkNames(QComboBox *target_link_qcb_) {
+  target_link_qcb_->clear();
+  for (auto &link_name : move_groups_[current_mg_].link_names)
+    target_link_qcb_->addItem(link_name.c_str());
+  target_link_qcb_->setCurrentIndex(0);
+  target_link_ = target_link_qcb_->currentText().toStdString();
 }
 
 void JogFramePanelAbs::initInteractiveMarkers() {

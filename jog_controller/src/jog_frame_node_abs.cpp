@@ -19,11 +19,11 @@ JogFrameNodeAbs::JogFrameNodeAbs() {
   pnh.param<bool>("publish_tf", publish_tf_, true);
 
   std::vector<std::string> group_names;
-  gnh.getParam("/jog_frame_node/group_names", group_names);
+  gnh.getParam("jog_frame_node/group_names", group_names);
   group_name_ = group_names.size() > 0 ? group_names[0] : "";
 
   std::vector<std::string> link_names;
-  gnh.getParam("/jog_frame_node/link_names", link_names);
+  gnh.getParam("jog_frame_node/link_names", link_names);
   target_link_ = link_names.size() > 0 ? link_names[0] : "";
 
   avoid_collisions_ = true;
@@ -53,12 +53,12 @@ JogFrameNodeAbs::JogFrameNodeAbs() {
 
   // Create subscribers
   joint_state_sub_ =
-      gnh.subscribe("joint_states", 1, &JogFrameNodeAbs::joint_state_cb, this);
+      gnh.subscribe("/joint_states", 1, &JogFrameNodeAbs::joint_state_cb, this);
   jog_frame_sub_ =
       gnh.subscribe("jog_frame_abs", 1, &JogFrameNodeAbs::jog_frame_cb, this);
-  fk_client_ = gnh.serviceClient<moveit_msgs::GetPositionFK>("compute_fk");
-  ik_client_ = gnh.serviceClient<moveit_msgs::GetPositionIK>("compute_ik");
-  ros::topic::waitForMessage<sensor_msgs::JointState>("joint_states");
+  fk_client_ = gnh.serviceClient<moveit_msgs::GetPositionFK>("/compute_fk");
+  ik_client_ = gnh.serviceClient<moveit_msgs::GetPositionIK>("/compute_ik");
+  ros::topic::waitForMessage<sensor_msgs::JointState>("/joint_states");
 
   if (use_action_) {
     // Create action client for each controller
@@ -87,7 +87,7 @@ JogFrameNodeAbs::JogFrameNodeAbs() {
     for (auto it = cinfo_map_.begin(); it != cinfo_map_.end(); it++) {
       auto controller_name = it->first;
       traj_pubs_[controller_name] =
-          gnh.advertise<trajectory_msgs::JointTrajectory>(
+          gnh.advertise<trajectory_msgs::JointTrajectory>("/" +
               controller_name + "/command", 10);
     }
   }
