@@ -9,7 +9,7 @@
 namespace jog_frame {
 
 JogFrameNodeAbs::JogFrameNodeAbs() {
-  ros::NodeHandle gnh, pnh("~");
+  ros::NodeHandle gnh, pnh("~"); //gnh with ns, pnh without
 
   ROS_WARN("Absolute mode enabled!");
 
@@ -253,8 +253,12 @@ void JogFrameNodeAbs::jogStep() {
     return;
   }
 
+  // ik.request.ik_request.constraints.orientation_constraints.push_back(
+  //    orientation_constraint);
   // position and orientation are close enough
-  if (position_dist < 0.0005 && orientation_dist < 0.001) {
+  // TODO
+  // if (position_dist < 0.0005 && orientation_dist < 0.001) {
+  if (position_dist < 0.005 && orientation_dist < 0.05) {
     return;
   }
 
@@ -350,7 +354,7 @@ void JogFrameNodeAbs::jogStep() {
   // Make sure the jump in joint space is not to large
   bool has_errors = false;
 
-  /*
+
   // TODO, this seems wrong, I should rethink about this
   for (int i = 0; i < ik_solution.name.size(); i++) {
     for (int j = 0; j < joint_state_.name.size(); j++) {
@@ -372,9 +376,10 @@ void JogFrameNodeAbs::jogStep() {
   if (has_errors) {
     ROS_ERROR_STREAM("**** Abort, jump to large!");
     return;
-  }*/
+  }
 
   // Make sure the solution is valid in joint space
+  /*
   double error = 0;
   int id = -1;
   for (int i = 0; i < ik_solution.name.size(); i++) {
@@ -394,7 +399,7 @@ void JogFrameNodeAbs::jogStep() {
                                                       << ik_solution.name[id]);
     return;
   }
-
+  */
   publishPose(ik_solution);
 }
 
