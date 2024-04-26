@@ -1,0 +1,30 @@
+jog_joint_node:
+  joint_names:
+    - joint_1
+    - joint_2
+    - joint_3
+    - joint_4
+    - joint_5
+    - joint_6
+    - joint_7
+
+jog_frame_node:
+  base_frame: base_link
+  group_names:
+    - arm_with_tcp
+  link_names:
+    - diana_gripper/tcp
+
+move_group:
+  controller_list:
+    - name: diana7_trajectory_controller
+      action_ns: follow_joint_trajectory
+      type: FollowJointTrajectory
+      joints:
+        - joint_1
+        - joint_2
+        - joint_3
+        - joint_4
+        - joint_5
+        - joint_6
+        - joint_7

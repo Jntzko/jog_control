@@ -11,9 +11,13 @@ find_package(catkin REQUIRED COMPONENTS
   moveit_ros_planning
   moveit_visual_tools
   moveit_msgs
+  moveit_ros_planning_interface
   roscpp
   roslaunch
   rviz
+  tf2_ros
+  tf2
+  tf2_geometry_msgs
 )
 
 find_package(Boost REQUIRED system filesystem date_time thread)
@@ -50,7 +54,8 @@ add_definitions(-DQT_NO_KEYWORDS -g)
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 set(HEADER_FILES
-  src/jog_frame_panel.h src/jog_joint_panel.h src/jog_slider.h src/jog_frame_panel_abs.h
+  #src/jog_frame_panel.h 
+  src/jog_joint_panel.h src/jog_slider.h src/jog_frame_panel_abs.h
 )
 
 if(rviz_QT_VERSION VERSION_LESS "5")
@@ -60,7 +65,7 @@ else()
 endif()
 
 set(SOURCE_FILES
-  src/jog_frame_panel.cpp
+  #src/jog_frame_panel.cpp
   src/jog_frame_panel_abs.cpp
   src/jog_joint_panel.cpp
   ${MOC_FILES}

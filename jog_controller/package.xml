@@ -19,6 +19,10 @@
   <depend>moveit_ros_planning</depend>
   <depend>moveit_visual_tools</depend>
   <depend>moveit_msgs</depend>
+  <depend>moveit_ros_planning_interface</depend>
+  <depend>tf2_ros</depend>
+  <depend>tf2</depend>
+  <depend>tf2_geometry_msgs</depend>
   <depend>roscpp</depend>
   <build_depend>roslaunch</build_depend>
   <depend>rviz</depend>

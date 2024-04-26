@@ -191,7 +191,7 @@ void JogFramePanel::onInitialize()
 
 void JogFramePanel::update()
 {
-  tf::TransformListener* tf = vis_manager_->getTFClient();
+  tf::TransformListener* tf = vis_manager_->getTF2BufferPtr();
   tf::StampedTransform transform;
   try{
     tf->lookupTransform(frame_id_, target_link_id_, ros::Time(0), transform);
