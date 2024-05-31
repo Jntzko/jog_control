@@ -358,42 +358,23 @@ void JogFrameNodeAbs::jogStep() {
   bool has_errors = false;
 
 
-  // TODO, this seems wrong, I should rethink about this
+  // Make sure the jump in joint space is not to large
   for (int i = 0; i < ik_solution.name.size(); i++) {
     for (int j = 0; j < joint_state_.name.size(); j++) {
       if (ik_solution.name[i] == joint_state_.name[j]) {
+        // TODO: fix this for infinite joints
         // if the joint state range is outside -Pi to Pi, we map it to that
         // range TODO only for infinit joints
-        double ref_state = fmod(joint_state_.position[j] + M_PI, 2 * M_PI);
-        if (ref_state < 0)
-          ref_state += 2 * M_PI;
-        ref_state -= M_PI;
-        double e = fabs(ik_solution.position[i] - ref_state);
-        if (e > M_PI / 2 and e < M_PI * 1.5) {
-          has_errors = true;
-        }
-        break;
-      }
-    }
-  }
-  if (has_errors) {
-    ROS_ERROR_STREAM("**** Abort, jump to large!");
-    return;
-  }
-
-  // Make sure the solution is valid in joint space
-  /*
-  double error = 0;
-  int id = -1;
-  for (int i = 0; i < ik_solution.name.size(); i++) {
-    for (int j = 0; j < joint_state_.name.size(); j++) {
-      if (ik_solution.name[i] == joint_state_.name[j]) {
+        //double ref_state = fmod(joint_state_.position[j] + M_PI, 2 * M_PI);
+        //if (ref_state < 0)
+        //  ref_state += 2 * M_PI;
+        //ref_state -= M_PI;
         double e = fabs(ik_solution.position[i] - joint_state_.position[j]);
-        if (e > error) {
-          error = e;
-          id = i;
+        if (e > 0.2) {
+          ROS_ERROR_STREAM("Abort, jump to large: Joint " << ik_solution.name[i]
+                                                          << " " << e);
+          return;
         }
-        break;
       }
     }
   }
