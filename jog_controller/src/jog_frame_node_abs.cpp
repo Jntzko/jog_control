@@ -119,8 +119,7 @@ void JogFrameNodeAbs::jog_frame_cb(jog_msgs::JogFrameAbsConstPtr msg) {
       }
     }
   }
-  // Update reference frame only if the stamp is older than last_stamp_ +
-  // time_from_start_
+  // Update reference frame only if the stamp is newer than last_stamp_
   if (msg->header.stamp > last_stamp_) {
     // update our reference message for the secondary thread
     frame_id_ = msg->header.frame_id;
@@ -130,21 +129,22 @@ void JogFrameNodeAbs::jog_frame_cb(jog_msgs::JogFrameAbsConstPtr msg) {
     if (msg->damping_factor != 0) {
       damping_fac_ = std::min(1.0, std::max(0.1, msg->damping_factor));
     }
-    ref_msg_ = msg;
     ref_msg_ = msg; // update the goal
     motion_completed_ = false;
 
     // Update timestamp of the last jog command
     last_stamp_ = msg->header.stamp;
+
+
+    if (publish_tf_) {
+      static tf::TransformBroadcaster br;
+      tf::Transform transform;
+      tf::poseMsgToTF(msg->pose, transform);
+      br.sendTransform(tf::StampedTransform(transform, msg->header.stamp,
+                                            msg->header.frame_id, "jog_goal"));
+    }
   }
 
-  if (publish_tf_) {
-    static tf::TransformBroadcaster br;
-    tf::Transform transform;
-    tf::poseMsgToTF(msg->pose, transform);
-    br.sendTransform(tf::StampedTransform(transform, msg->header.stamp,
-                                          msg->header.frame_id, "jog_goal"));
-  }
 }
 
 /**
@@ -222,11 +222,11 @@ void JogFrameNodeAbs::jogStep() {
   ik.request.ik_request.avoid_collisions = avoid_collisions_;
   ik.request.ik_request.return_approximate_solution = true;
 
-  geometry_msgs::Pose act_pose = pose_stamped_.pose;
-  geometry_msgs::PoseStamped ref_pose;
+  geometry_msgs::Pose act_pose = pose_stamped_.pose;  // current pose of the robot
+  geometry_msgs::PoseStamped ref_pose;  // current goal pose
 
   ref_pose.header.frame_id = ref_msg_->header.frame_id;
-  ref_pose.header.stamp = ros::Time::now();
+  ref_pose.header.stamp = ros::Time::now();  // update timestamp to now
 
   double dirX = ref_msg_->pose.position.x - act_pose.position.x;
   double dirY = ref_msg_->pose.position.y - act_pose.position.y;
@@ -250,6 +250,8 @@ void JogFrameNodeAbs::jogStep() {
   tf::Quaternion q_ref, q_act, q_jog, q_target;
   tf::quaternionMsgToTF(act_pose.orientation, q_act);
   tf::quaternionMsgToTF(ref_msg_->pose.orientation, q_target);
+  ROS_INFO_STREAM("cart_position_limit_: " << cart_position_limit_);
+  ROS_INFO_STREAM("cart_orientation_limit_: " << cart_orientation_limit_);
 
   // Limit orientation movement distance and apply damping
   double orientation_dist = tf::angleShortestPath(q_act, q_target);
@@ -269,11 +271,7 @@ void JogFrameNodeAbs::jogStep() {
     return;
   }
 
-  // ik.request.ik_request.constraints.orientation_constraints.push_back(
-  //    orientation_constraint);
-  // position and orientation are close enough
-  // TODO
-  // if (position_dist < 0.0005 && orientation_dist < 0.001) {
+  // ignore tiny movements and declare movement as finished
   if (position_dist < 0.005 && orientation_dist < 0.05) {
     motion_completed_ = true;
     return;
@@ -282,94 +280,17 @@ void JogFrameNodeAbs::jogStep() {
   quaternionTFToMsg(q_ref, ref_pose.pose.orientation);
   ik.request.ik_request.pose_stamped = ref_pose;
 
-  /*
-  // As we use approximate solution, we still want to make sure to stay within
-  // some constraints
-  // Orientation
-  moveit_msgs::OrientationConstraint orientation_constraint;
-  orientation_constraint.header.frame_id = frame_id_;
-  orientation_constraint.link_name = target_link_;
-  orientation_constraint.orientation = ref_pose.pose.orientation;
-  // Should be ~ 30 Degrees on each axis
-  orientation_constraint.absolute_x_axis_tolerance = 0.05;
-  orientation_constraint.absolute_y_axis_tolerance = 0.05;
-  orientation_constraint.absolute_z_axis_tolerance = 0.05;
-  orientation_constraint.weight = 1;
-
-  // Position
-  moveit_msgs::PositionConstraint position_constraint;
-  position_constraint.header.frame_id = frame_id_;
-  position_constraint.link_name = target_link_;
-  position_constraint.target_point_offset.x = 0.01;
-  position_constraint.target_point_offset.y = 0.01;
-  position_constraint.target_point_offset.z = 0.01;
-  position_constraint.weight = 1;
-
-  ik.request.ik_request.constraints.orientation_constraints.push_back(
-      orientation_constraint);
-  ik.request.ik_request.constraints.position_constraints.push_back(
-      position_constraint);
-*/
   sensor_msgs::JointState ik_solution;
 
-  bool bio_ik = false;
-  if (bio_ik) {
-    kinematics::KinematicsQueryOptions opts;
-    // TODO position only
-    opts.return_approximate_solution = true; // optional
-                                             // opts.
-
-    robot_model_ = robot_model_loader_->getModel();
-    robot_state::RobotState robot_state_ik(robot_model_);
-    joint_model_group_ = robot_model_->getJointModelGroup(group_name_);
-
-    std::vector<std::string> names = joint_state_.name;
-    std::vector<double> positions = joint_state_.position;
-
-    for (int i = 0; i < names.size(); i++) {
-      std::string name = names[i];
-      double position = positions[i];
-      robot_state_ik.setJointPositions(name, &position);
-    }
-
-    // traditional "basic" bio-ik usage. The end-effector goal poses
-    // and end-effector link names are passed into the setFromIK()
-    // call. The KinematicsQueryOptions are empty.
-    //
-    bool ok = robot_state_ik.setFromIK(
-        joint_model_group_, // joints to be used for IK
-        ref_pose.pose,      // multiple end-effector goal poses
-        target_link_,       // names of the end-effector links
-        1, 0.0,             // solver attempts and timeout
-        moveit::core::GroupStateValidityCallbackFn(),
-        opts // mostly empty
-    );
-
-    moveit_msgs::RobotState solution;
-    moveit::core::robotStateToRobotStateMsg(robot_state_ik, solution, true);
-
-    ROS_WARN_STREAM("***** TODO check for collision" << ok);
-
-    // auto ik_solution = ik.response.solution.joint_state;
-    ik_solution = solution.joint_state;
-    // ROS_ERROR_STREAM("bioik " << solution.joint_state.name.size());
-    // ROS_ERROR_STREAM("mov   " <<
-    // ik.response.solution.joint_state.name.size());
-  } else {
-
-    if (!ik_client_.call(ik)) {
-      ROS_ERROR("Failed to call service /compute_ik");
-      return;
-    }
-    if (ik.response.error_code.val != moveit_msgs::MoveItErrorCodes::SUCCESS) {
-      ROS_WARN("****IK error %d", ik.response.error_code.val);
-      return;
-    }
-    ik_solution = ik.response.solution.joint_state;
+  if (!ik_client_.call(ik)) {
+    ROS_ERROR("Failed to call service /compute_ik");
+    return;
   }
-
-  // Make sure the jump in joint space is not to large
-  bool has_errors = false;
+  if (ik.response.error_code.val != moveit_msgs::MoveItErrorCodes::SUCCESS) {
+    ROS_WARN("****IK error %d", ik.response.error_code.val);
+    return;
+  }
+  ik_solution = ik.response.solution.joint_state;
 
 
   // Make sure the jump in joint space is not to large
@@ -392,12 +313,6 @@ void JogFrameNodeAbs::jogStep() {
       }
     }
   }
-  if (error > M_PI / 2) {
-    ROS_ERROR_STREAM("**** Validation check Failed: " << error << "  at: "
-                                                      << ik_solution.name[id]);
-    return;
-  }
-  */
   publishPose(ik_solution);
 }
 
