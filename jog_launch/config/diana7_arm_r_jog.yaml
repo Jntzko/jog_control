@@ -1,0 +1,32 @@
+jog_joint_node:
+  joint_names:
+    - arm_r_joint_1
+    - arm_r_joint_2
+    - arm_r_joint_3
+    - arm_r_joint_4
+    - arm_r_joint_5
+    - arm_r_joint_6
+    - arm_r_joint_7
+
+jog_frame_node:
+  base_frame: arm_r_base_link
+  group_names:
+    - arm_r
+  link_names:
+    - arm_r_link_7
+  cart_position_limit: 0.08
+  cart_orientation_limit: 0.2
+
+move_group:
+  controller_list:
+    - name: arm_r/joint_position_trajectory_controller
+      action_ns: follow_joint_trajectory
+      type: FollowJointTrajectory
+      joints:
+        - arm_r_joint_1
+        - arm_r_joint_2
+        - arm_r_joint_3
+        - arm_r_joint_4
+        - arm_r_joint_5
+        - arm_r_joint_6
+        - arm_r_joint_7

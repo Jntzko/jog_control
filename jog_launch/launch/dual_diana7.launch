@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="use_fake_joint" default="false"/>
+  <arg name="use_moveit" default="false"/>
+  <arg name="use_rviz" default="false"/>
+  <arg name="use_joy" default="false"/>
+  <arg name="use_action" default="false"/>
+  <arg name="intermittent" default="false"/>
+  <arg name="absolute" default="true"/>
+
+  <group ns="arm_r">
+    <rosparam command="load" file="$(find jog_launch)/config/diana7_arm_r_jog.yaml"/>
+    <node name="jog_frame_node_abs" pkg="jog_controller" type="jog_frame_node_abs"
+    if="$(eval absolute == true)" output="screen">
+      <param name="use_action" value="$(arg use_action)"/>
+      <param name="intermittent" value="$(arg intermittent)"/>
+    </node>
+  </group>
+
+  <group ns="arm_l">
+    <rosparam command="load" file="$(find jog_launch)/config/diana7_arm_l_jog.yaml"/>
+    <node name="jog_frame_node_abs" pkg="jog_controller" type="jog_frame_node_abs"
+    if="$(eval absolute == true)" output="screen">
+      <param name="use_action" value="$(arg use_action)"/>
+      <param name="intermittent" value="$(arg intermittent)"/>
+    </node>
+  </group>
+
+</launch>
