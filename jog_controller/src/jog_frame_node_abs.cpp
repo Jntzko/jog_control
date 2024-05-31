@@ -18,6 +18,9 @@ JogFrameNodeAbs::JogFrameNodeAbs() {
   pnh.param<bool>("intermittent", intermittent_, false);
   pnh.param<bool>("publish_tf", publish_tf_, true);
 
+  gnh.param<double>("jog_frame_node/cart_position_limit", cart_position_limit_, 0.05);
+  gnh.param<double>("jog_frame_node/cart_orientation_limit", cart_orientation_limit_, 0.2);
+
   std::vector<std::string> group_names;
   gnh.getParam("jog_frame_node/group_names", group_names);
   group_name_ = group_names.size() > 0 ? group_names[0] : "";
@@ -231,20 +234,31 @@ void JogFrameNodeAbs::jogStep() {
   double position_dist = sqrt(((double)dirX * dirX) + ((double)dirY * dirY) +
                               ((double)dirZ * dirZ));
 
+  auto clamp = [](double val, double limit) {
+    return std::min(std::max(val, -limit), limit);
+  };
+
+  // Limit cartesian movement distance and apply damping
   ref_pose.pose.position.x =
-      pose_stamped_.pose.position.x + dirX * damping_fac_;
+      pose_stamped_.pose.position.x + clamp(dirX * damping_fac_, cart_position_limit_);
   ref_pose.pose.position.y =
-      pose_stamped_.pose.position.y + dirY * damping_fac_;
+      pose_stamped_.pose.position.y + clamp(dirY * damping_fac_, cart_position_limit_);
   ref_pose.pose.position.z =
-      pose_stamped_.pose.position.z + dirZ * damping_fac_;
+      pose_stamped_.pose.position.z + clamp(dirZ * damping_fac_, cart_position_limit_);
 
   // Apply orientation jog
   tf::Quaternion q_ref, q_act, q_jog, q_target;
   tf::quaternionMsgToTF(act_pose.orientation, q_act);
   tf::quaternionMsgToTF(ref_msg_->pose.orientation, q_target);
 
+  // Limit orientation movement distance and apply damping
   double orientation_dist = tf::angleShortestPath(q_act, q_target);
-  q_ref = tf::slerp(q_act, q_target, damping_fac_);
+  if (orientation_dist > cart_orientation_limit_) {
+    q_jog = tf::slerp(q_act, q_target, cart_orientation_limit_ / orientation_dist);
+  } else {
+    q_jog = q_target;
+  }
+  q_ref = tf::slerp(q_act, q_jog, damping_fac_);  // damping the rotation
 
   try {
     tf::assertQuaternionValid(q_act);

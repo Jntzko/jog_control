@@ -64,6 +64,8 @@ protected:
   bool use_action_;
   bool intermittent_;
   bool publish_tf_;
+  double cart_position_limit_;
+  double cart_orientation_limit_;
 
   bool motion_completed_; 
 
