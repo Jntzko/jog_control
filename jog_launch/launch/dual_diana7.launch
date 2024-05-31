@@ -7,6 +7,20 @@
   <arg name="use_action" default="false"/>
   <arg name="intermittent" default="false"/>
   <arg name="absolute" default="true"/>
+  <arg name="load_trajectory_controller" default="true"/>
+  <arg name="start_clock_publisher" default="false"/>
+  <arg name="start_tcp_endpoint" default="false"/>
+
+  <node name="load_trajectory_controller" pkg="tams_diana7_tools" type="load_dual_arm_trajectory_controller.py" if="$(arg load_trajectory_controller)" output="screen"/>
+
+  <node name="clock_pub_node" pkg="tams_diana7_tools" type="clock_pub_node.py" if="$(arg start_clock_publisher)" output="screen"/>
+
+  <group if="$(arg start_tcp_endpoint)">
+    <include file="$(find ros_tcp_endpoint)/launch/endpoint.launch">
+      <arg name="tcp_ip" value="134.100.13.222"/>
+      <arg name="tcp_port" value="9090"/>
+    </include>
+  </group>
 
   <group ns="arm_r">
     <rosparam command="load" file="$(find jog_launch)/config/diana7_arm_r_jog.yaml"/>
