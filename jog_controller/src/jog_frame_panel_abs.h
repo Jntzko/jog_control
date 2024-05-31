@@ -67,6 +67,8 @@ protected:
   std::string frame_id_;
   bool avoid_collisions_;
   double damping_fac_;
+
+  ros::Time last_marker_feedback_time_;
 };
 
 } // namespace jog_controller

@@ -87,6 +87,9 @@ void JogFramePanelAbs::update() {
   if (master_on_publish_ && on_publish_marker_) {
     jog_frame_abs_pub_[current_mg_].publish(marker_msg_);
   }
+  if (ros::Time::now() - last_marker_feedback_time_ > ros::Duration(0.1)) {
+    resetInteractiveMarker();
+  }
 }
 
 void JogFramePanelAbs::load(const rviz::Config &config) {}
@@ -137,6 +140,7 @@ void JogFramePanelAbs::resetInteractiveMarker() {
 void JogFramePanelAbs::interactiveMarkerFeedback(
     const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback) {
   if (feedback != nullptr) {
+    last_marker_feedback_time_ = ros::Time::now();  // update last feedback time to be able to reset the marker when no feedback is received
     marker_msg_.header.stamp = ros::Time::now();
     marker_msg_.header.frame_id = frame_id_;
     marker_msg_.group_name = group_name_;
