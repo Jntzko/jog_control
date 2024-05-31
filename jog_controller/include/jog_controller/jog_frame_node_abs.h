@@ -64,8 +64,9 @@ protected:
   bool use_action_;
   bool intermittent_;
   bool publish_tf_;
-  double cart_position_limit_;
-  double cart_orientation_limit_;
+  double cart_position_limit_;  // maximal cartesian distance for one step
+  double cart_orientation_limit_;  // maximal cartesian orientation distance for one step
+  double joint_motion_limit_;  // maximal joint space distance for one step
 
   bool motion_completed_; 
 

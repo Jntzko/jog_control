@@ -20,6 +20,7 @@ JogFrameNodeAbs::JogFrameNodeAbs() {
 
   gnh.param<double>("jog_frame_node/cart_position_limit", cart_position_limit_, 0.05);
   gnh.param<double>("jog_frame_node/cart_orientation_limit", cart_orientation_limit_, 0.2);
+  gnh.param<double>("jog_frame_node/joint_motion_limit", joint_motion_limit_, 0.2);
 
   std::vector<std::string> group_names;
   gnh.getParam("jog_frame_node/group_names", group_names);
@@ -154,6 +155,11 @@ void JogFrameNodeAbs::update() {
   // After we received a first goal message
   if (ref_msg_ != nullptr) {
     if (ref_msg_->header.stamp.sec > 0 && ref_msg_->header.stamp.nsec > 0 && !motion_completed_) {
+      if(ros::Time::now() - ref_msg_->header.stamp > ros::Duration(5)) {
+        ROS_INFO("Last jog command is too old. Considering it as completed.");
+        motion_completed_ = true;
+        return;
+      }
       jogStep();
     }
   }
@@ -250,8 +256,6 @@ void JogFrameNodeAbs::jogStep() {
   tf::Quaternion q_ref, q_act, q_jog, q_target;
   tf::quaternionMsgToTF(act_pose.orientation, q_act);
   tf::quaternionMsgToTF(ref_msg_->pose.orientation, q_target);
-  ROS_INFO_STREAM("cart_position_limit_: " << cart_position_limit_);
-  ROS_INFO_STREAM("cart_orientation_limit_: " << cart_orientation_limit_);
 
   // Limit orientation movement distance and apply damping
   double orientation_dist = tf::angleShortestPath(q_act, q_target);
@@ -305,7 +309,7 @@ void JogFrameNodeAbs::jogStep() {
         //  ref_state += 2 * M_PI;
         //ref_state -= M_PI;
         double e = fabs(ik_solution.position[i] - joint_state_.position[j]);
-        if (e > 0.2) {
+        if (e > joint_motion_limit_) {
           ROS_ERROR_STREAM("Abort, jump to large: Joint " << ik_solution.name[i]
                                                           << " " << e);
           return;

@@ -16,6 +16,7 @@ jog_frame_node:
     - arm_l_link_7
   cart_position_limit: 0.08
   cart_orientation_limit: 0.2
+  joint_motion_limit: 0.2
 
 move_group:
   controller_list:
