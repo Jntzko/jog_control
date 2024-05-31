@@ -128,6 +128,8 @@ void JogFrameNodeAbs::jog_frame_cb(jog_msgs::JogFrameAbsConstPtr msg) {
       damping_fac_ = std::min(1.0, std::max(0.1, msg->damping_factor));
     }
     ref_msg_ = msg;
+    ref_msg_ = msg; // update the goal
+    motion_completed_ = false;
 
     // Update timestamp of the last jog command
     last_stamp_ = msg->header.stamp;
@@ -146,9 +148,9 @@ void JogFrameNodeAbs::jog_frame_cb(jog_msgs::JogFrameAbsConstPtr msg) {
  * Worker thread for calulation
  */
 void JogFrameNodeAbs::update() {
-  // TODO necessary?
+  // After we received a first goal message
   if (ref_msg_ != nullptr) {
-    if (ref_msg_->header.stamp.sec > 0 && ref_msg_->header.stamp.nsec > 0) {
+    if (ref_msg_->header.stamp.sec > 0 && ref_msg_->header.stamp.nsec > 0 && !motion_completed_) {
       jogStep();
     }
   }
@@ -259,6 +261,7 @@ void JogFrameNodeAbs::jogStep() {
   // TODO
   // if (position_dist < 0.0005 && orientation_dist < 0.001) {
   if (position_dist < 0.005 && orientation_dist < 0.05) {
+    motion_completed_ = true;
     return;
   }
 

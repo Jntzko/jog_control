@@ -65,6 +65,8 @@ protected:
   bool intermittent_;
   bool publish_tf_;
 
+  bool motion_completed_; 
+
   robot_model_loader::RobotModelLoader *robot_model_loader_;
   moveit::core::RobotModelPtr robot_model_;
   moveit::core::JointModelGroup *joint_model_group_;
