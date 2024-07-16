@@ -14,9 +14,10 @@ jog_frame_node:
     - arm_l
   link_names:
     - arm_l_link_7
+    - q_gripper_l_grasp_tip_mirrored
   cart_position_limit: 0.08
-  cart_orientation_limit: 0.2
-  joint_motion_limit: 0.2
+  cart_orientation_limit: 0.4
+  joint_motion_limit: 0.8
 
 move_group:
   controller_list:
