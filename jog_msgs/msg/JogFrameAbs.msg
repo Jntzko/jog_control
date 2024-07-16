@@ -25,3 +25,5 @@ geometry_msgs/Pose pose
 # resulting in faster movements when the target is far away and precise movements
 # when the target is very close.
 float64 damping_factor
+
+# If true, the target threshold will be reduced

@@ -32,6 +32,7 @@ JogFrameNodeAbs::JogFrameNodeAbs() {
 
   avoid_collisions_ = true;
   damping_fac_ = 0.5;
+  precision_mode_ = false;
 
   if (not use_action_ && intermittent_) {
     ROS_WARN("'intermittent' param should be true with 'use_action'. Assuming "
@@ -132,6 +133,8 @@ void JogFrameNodeAbs::jog_frame_cb(jog_msgs::JogFrameAbsConstPtr msg) {
     }
     ref_msg_ = msg; // update the goal
     motion_completed_ = false;
+
+    precision_mode_ = msg->precision_mode;
 
     // Update timestamp of the last jog command
     last_stamp_ = msg->header.stamp;
@@ -276,7 +279,17 @@ void JogFrameNodeAbs::jogStep() {
   }
 
   // ignore tiny movements and declare movement as finished
-  if (position_dist < 0.005 && orientation_dist < 0.05) {
+  float position_threshold, orientation_threshold;
+  if (precision_mode_){
+    position_threshold = 0.0005;
+    orientation_threshold = 0.005;
+  }
+  else{
+    position_threshold = 0.005;
+    orientation_threshold = 0.05;
+  }
+
+  if (position_dist < position_threshold && orientation_dist < orientation_threshold) {
     motion_completed_ = true;
     return;
   }

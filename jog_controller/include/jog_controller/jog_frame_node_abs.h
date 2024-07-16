@@ -69,6 +69,7 @@ protected:
   double joint_motion_limit_;  // maximal joint space distance for one step
 
   bool motion_completed_; 
+  bool precision_mode_;
 
   robot_model_loader::RobotModelLoader *robot_model_loader_;
   moveit::core::RobotModelPtr robot_model_;
