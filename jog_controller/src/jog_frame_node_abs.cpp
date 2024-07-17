@@ -29,6 +29,7 @@ JogFrameNodeAbs::JogFrameNodeAbs() {
   std::vector<std::string> link_names;
   gnh.getParam("jog_frame_node/link_names", link_names);
   target_link_ = link_names.size() > 0 ? link_names[0] : "";
+  tf2_listener_ = new tf2_ros::TransformListener(tf_buffer_);
 
   avoid_collisions_ = true;
   damping_fac_ = 0.5;
@@ -62,7 +63,8 @@ JogFrameNodeAbs::JogFrameNodeAbs() {
   jog_frame_sub_ =
       gnh.subscribe("jog_frame_abs", 1, &JogFrameNodeAbs::jog_frame_cb, this);
   fk_client_ = gnh.serviceClient<moveit_msgs::GetPositionFK>("/compute_fk");
-  ik_client_ = gnh.serviceClient<moveit_msgs::GetPositionIK>("/compute_ik");
+  ik_client_ = gnh.serviceClient<bio_ik_msgs::GetIK>("/bio_ik/get_bio_ik");
+
   ros::topic::waitForMessage<sensor_msgs::JointState>("/joint_states");
 
   if (use_action_) {
@@ -222,14 +224,16 @@ void JogFrameNodeAbs::jogStep() {
   // get the current pose, accessiable via pose_stamped_
   getFkPose();
 
+
+
   // Solve inverse kinematics
-  moveit_msgs::GetPositionIK ik;
+  bio_ik_msgs::GetIK ik;
 
   ik.request.ik_request.group_name = group_name_;
-  ik.request.ik_request.ik_link_name = target_link_;
+  //ik.request.ik_request.ik_link_name = target_link_;
   ik.request.ik_request.robot_state.joint_state = joint_state_;
   ik.request.ik_request.avoid_collisions = avoid_collisions_;
-  ik.request.ik_request.return_approximate_solution = true;
+  ik.request.ik_request.approximate = true;
 
   geometry_msgs::Pose act_pose = pose_stamped_.pose;  // current pose of the robot
   geometry_msgs::PoseStamped ref_pose;  // current goal pose
@@ -295,19 +299,37 @@ void JogFrameNodeAbs::jogStep() {
   }
 
   quaternionTFToMsg(q_ref, ref_pose.pose.orientation);
-  ik.request.ik_request.pose_stamped = ref_pose;
+
+  geometry_msgs::TransformStamped tf_transform; 
+
+  tf_transform = tf_buffer_.lookupTransform("world", ref_pose.header.frame_id, ros::Time(0), ros::Duration(1.0) );
+
+  tf2::doTransform(ref_pose, ref_pose, tf_transform);
+  bio_ik_msgs::PoseGoal pose_goal;
+  pose_goal.pose = ref_pose.pose;
+  pose_goal.link_name = target_link_;
+  pose_goal.weight = 1.0;
+  ik.request.ik_request.pose_goals.push_back(pose_goal);
+  bio_ik_msgs::MinimalDisplacementGoal disp_goal;
+  disp_goal.weight = 0.5;
+  disp_goal.primary = false;
+  ik.request.ik_request.minimal_displacement_goals.push_back(disp_goal);
+  bio_ik_msgs::CenterJointsGoal center_goal;
+  center_goal.weight = 0.3;
+  center_goal.primary = false;
+  ik.request.ik_request.center_joints_goals.push_back(center_goal);
 
   sensor_msgs::JointState ik_solution;
 
   if (!ik_client_.call(ik)) {
-    ROS_ERROR("Failed to call service /compute_ik");
+    ROS_ERROR("Failed to call service /bio_ik/get_bio_ik");
     return;
   }
-  if (ik.response.error_code.val != moveit_msgs::MoveItErrorCodes::SUCCESS) {
-    ROS_WARN("****IK error %d", ik.response.error_code.val);
+  if (ik.response.ik_response.error_code.val != moveit_msgs::MoveItErrorCodes::SUCCESS) {
+    ROS_WARN("****IK error %d", ik.response.ik_response.error_code.val);
     return;
   }
-  ik_solution = ik.response.solution.joint_state;
+  ik_solution = ik.response.ik_response.solution.joint_state;
 
 
   // Make sure the jump in joint space is not to large

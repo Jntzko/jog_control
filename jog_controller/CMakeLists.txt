@@ -5,6 +5,7 @@ add_compile_options(-std=c++11)
 
 find_package(catkin REQUIRED COMPONENTS
   actionlib
+  bio_ik_msgs
   control_msgs
   jog_msgs
   moveit_core

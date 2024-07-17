@@ -10,13 +10,16 @@
 #include <moveit/robot_state/robot_state.h>
 #include <moveit_msgs/GetPositionFK.h>
 #include <moveit_msgs/GetPositionIK.h>
+#include <bio_ik_msgs/GetIK.h>
 #include <mutex>
 #include <ros/ros.h>
 #include <sensor_msgs/JointState.h>
 #include <string>
 #include <tf/tf.h>
 #include <tf/transform_broadcaster.h>
-#include <trajectory_msgs/JointTrajectoryPoint.h>
+#include <trajectory_msgs/JointTrajectoryPoint.h> 
+#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+#include <tf2_ros/transform_listener.h>
 
 typedef actionlib::SimpleActionClient<control_msgs::FollowJointTrajectoryAction>
     TrajClient;
@@ -89,6 +92,8 @@ protected:
   ros::Time last_stamp_;
 
   static tf::TransformBroadcaster br;
+  tf2_ros::Buffer tf_buffer_;
+  tf2_ros::TransformListener* tf2_listener_;
 };
 
 } // namespace jog_frame
