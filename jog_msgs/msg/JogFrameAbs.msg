@@ -27,3 +27,4 @@ geometry_msgs/Pose pose
 float64 damping_factor
 
 # If true, the target threshold will be reduced
+bool precision_mode
